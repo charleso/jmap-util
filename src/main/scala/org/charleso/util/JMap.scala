@@ -1,23 +1,32 @@
 package org.charleso.util
 
 import java.io.File
-import org.apache.commons.io.comparator.NameFileComparator
-import scala.io.Source
-import org.apache.commons.io.FileUtils
 
-import scalaz._
-import Scalaz._
+import scala.collection.GenTraversable
+import scala.io.Source
+
+import scalaz.Scalaz._
+import scalaz.effects.io
+import scalaz.effects.putStrLn
 
 object JMap {
 
   type Line = List[(Int, Int)]
 
-  def main(args: Array[String]) = println(filterAll(parseAll(args(0)), instances).take(100).mkString("\n"))
+  def main(args: Array[String]) {
+    val all = for {
+      files <- parseAll(args(0))
+      lines <- files.map(getLines).sequence
+      val string = filterAll(joinLines(lines), instances).take(100).mkString("\n")
+      _ <- putStrLn(string)
+    } yield ()
+    all.unsafePerformIO
+  }
 
-  def parseAll(dir: String) = new File(dir).listFiles().sorted
-    .par
-    .map(f => parseLines(Source.fromFile(f).getLines()))
-    .reduce(_ |+| _)
+  def joinLines(lines: GenTraversable[Iterator[String]]) = lines.map(parseLines).reduce(_ |+| _)
+
+  def parseAll(dir: String) = io { new File(dir).listFiles().sorted.toList }
+  def getLines(file: File) = io { Source.fromFile(file).getLines() }
 
   def parseLines(lines: Iterator[String]) = {
     lines.dropWhile(!_.contains(":"))
